@@ -1,103 +1,50 @@
-import React from 'react';
-import Head from "next/head";
-import Link from "next/link";
-import * as WarXML from 'src/pages/WarXML'
+import { useQueryDialogue } from '~/hooks/useQueryDialogue';
+import {useState, useMemo, useCallback} from "react";
+import { useQueryScript } from '~/hooks/useQueryScript';
 
 export default function Home() {
-  let obj: WarXML.Root
-  const [war, setWar] = React.useState("https://api.atlasacademy.io/nice/NA/war/100?lang=en");
-  const [json, setJson] = React.useState();
-  const [script, setScript] = React.useState();
-  const [spots, setSpots] = React.useState(); //spots is an array of the locations (X-A, X-E, X-F, etc.)
-    //an important note is that all quests in that spot are listed in that spot (including interludes and rankups)
-  const [quests, setQuests] = React.useState(); //quests is an array of each of the quests at a location
-  const [phases, setPhases] = React.useState()//phases being arrows
-  const [scripts, setScripts] = React.useState();//so scripts per phase are pre and post battle
-  
-  var currentSpot = 0;
-  var currentQuest = 0;
-  var currentPhase = 0;
-  var currentScript = 0;
+  const {data: root} = useQueryDialogue()
+  const [scriptIndex, setScriptIndex] = useState(0)
+  const [phaseScriptIndex, setPhaseScriptIndex] = useState(0)
+  const [questIndex, setQuestIndex] = useState(0)
+  const [spotIndex, setSpotIndex] = useState(0)
+  //root -> spots[] -> quests[] -> phaseScripts[] -> scripts[] -> script
+  const scriptUrl = useMemo (() => 
+  root?.spots[spotIndex]?.quests[questIndex]?.phaseScripts[phaseScriptIndex]?.scripts[scriptIndex]?.script, 
+  [root, spotIndex, questIndex, phaseScriptIndex, scriptIndex])
+  const { data: script, isFetched: isFetchedScript} = useQueryScript(scriptUrl)
 
+  const scripts = root?.spots[spotIndex]?.quests[questIndex]?.phaseScripts[phaseScriptIndex]?.scripts
+  const phaseScripts = root?.spots[spotIndex]?.quests[questIndex]?.phaseScripts
+  const quests = root?.spots[spotIndex]?.quests
 
+  const onClick = useCallback(() => {
+    if (!scripts || !phaseScripts || !quests) return
 
-  const getScript = async () => {
-    await fetch("https://api.atlasacademy.io/nice/NA/war/100?lang=en")
-    .then((response) => response.json())
-    .then(data => {setWar(data)}) //yo so like how do I make everything else wait for this fetch to complete first
-    //.then((data) => obj = JSON.parse(data))
-    console.log(war.spots);
-    setSpots(war.spots);
-
-    console.log(spots[0].quests);
-    setQuests(spots[0].quests);
-
-    console.log(quests[0].phaseScripts);
-    setPhases(quests[0].phaseScripts);
-
-    console.log(phases[0].scripts)
-    setScripts(phases[0].scripts);
-
-    currentSpot = 0;
-    currentQuest = 0;
-    currentPhase = 0;
-    currentScript = 0;
-
-    await fetch (scripts[0].script)
-    .then((response) => response.text())
-    .then(text => setScript(text))
-
-    
-
-
-  }
-  
-  function getNext() {
-    currentScript++;
-    console.log("%i %i", currentScript, scripts.length);
-     if(currentScript >= scripts.length) {
-      console.log("increment Phase");
-      currentScript = 0;
-      currentPhase++;
-      //setScripts(phases[currentPhase].scripts);
-      
+    if(scriptIndex < scripts.length-1) {
+      setScriptIndex(scriptIndex+1)
+      return
     }
-    if(currentPhase >= phases.length) {
-      console.log("increment Quest");
-      currentPhase = 0;
-      currentQuest++;
-      //setPhases(quests[currentQuest].phaseScripts);
-      //setScripts(phases[currentPhase].scripts);
-      
+    setScriptIndex(0)
+    if(phaseScriptIndex < phaseScripts.length-1) {
+      setPhaseScriptIndex(phaseScriptIndex+1)
+      return
     }
-    if(currentQuest >= quests.length) {
-      console.log("increment Spot");
-      //currentQuest = 0;
-      //currentSpot++;
-      //setPhases(quests[currentQuest].phaseScripts);
-      //setQuests(spots[currentSpot].quests);
-    } 
-   
+    setPhaseScriptIndex(0)
+    if(questIndex < quests.length-1) {
+      setQuestIndex(questIndex+1)
+      return
+    }
+  }, [scripts, phaseScripts, quests, scriptIndex, phaseScriptIndex, questIndex])
 
-    //setSpots(war.spots)
-    
-
-    console.log('S:%i P:%i Q:%i Sp:%i', currentScript, currentPhase, currentQuest, currentSpot);
-    console.log(quests[currentQuest].name);
-
-    fetch (scripts[currentScript].script)
-    .then((response) => response.text())
-    .then(text => setScript(text)) 
-
-  }
-
-
-  //const warID: number = JSON.parse(script)
   return (
     <>
-      <button onClick = {getScript}> Click </button>
-      <br></br>{script} <br></br>
-      <button onClick = {getNext}> NEXT! </button>
+    {!isFetchedScript ? <>
+    Loading
+    </> : <>
+      {script}
+      <button onClick={onClick}>Next</button>
+    </> }
     </>
   );
 }
